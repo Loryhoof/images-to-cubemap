@@ -177,7 +177,6 @@ export default function Home() {
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [exportFormat, setExportFormat] = useState<ExportFormat>("cross");
-  const [touchStartIndex, setTouchStartIndex] = useState<number | null>(null);
   const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const bulkInputRef = useRef<HTMLInputElement | null>(null);
   const slotRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -323,8 +322,37 @@ export default function Home() {
     fileInputRefs.current[index]?.click();
   };
 
-  // Touch event handlers - document level for reliability
+  // Touch event handlers - all native for iOS compatibility
   React.useEffect(() => {
+    const findSlotIndex = (element: Element | null): number => {
+      let slotElement = element as HTMLElement | null;
+      while (slotElement && !slotElement.classList.contains('face-slot')) {
+        slotElement = slotElement.parentElement as HTMLElement | null;
+      }
+      if (!slotElement) return -1;
+      const allSlots = Array.from(document.querySelectorAll('.face-slot'));
+      return allSlots.indexOf(slotElement);
+    };
+
+    const handleTouchStart = (e: TouchEvent) => {
+      const touch = e.touches[0];
+      const element = document.elementFromPoint(touch.clientX, touch.clientY);
+      const index = findSlotIndex(element);
+      
+      if (index === -1) return;
+      
+      // Check if this slot has an image by checking for the has-image class
+      const slotElement = document.querySelectorAll('.face-slot')[index];
+      if (!slotElement?.classList.contains('has-image')) return;
+      
+      // Prevent default to stop browser from scrolling or triggering click
+      e.preventDefault();
+      
+      isDraggingTouch.current = false;
+      touchStartIndexRef.current = index;
+      setDraggedIndex(index);
+    };
+
     const handleTouchMove = (e: TouchEvent) => {
       const startIndex = touchStartIndexRef.current;
       if (startIndex === null) return;
@@ -334,19 +362,10 @@ export default function Home() {
       
       const touch = e.touches[0];
       const element = document.elementFromPoint(touch.clientX, touch.clientY);
+      const targetIndex = findSlotIndex(element);
       
-      // Find the face-slot element
-      let slotElement = element as HTMLElement | null;
-      while (slotElement && !slotElement.classList.contains('face-slot')) {
-        slotElement = slotElement.parentElement as HTMLElement | null;
-      }
-      
-      if (slotElement) {
-        const allSlots = Array.from(document.querySelectorAll('.face-slot'));
-        const targetIndex = allSlots.indexOf(slotElement);
-        if (targetIndex !== -1) {
-          setDragOverIndex(targetIndex);
-        }
+      if (targetIndex !== -1) {
+        setDragOverIndex(targetIndex);
       } else {
         setDragOverIndex(null);
       }
@@ -359,60 +378,45 @@ export default function Home() {
       // Get the element under the touch point
       const touch = e.changedTouches[0];
       const element = document.elementFromPoint(touch.clientX, touch.clientY);
+      const targetIndex = findSlotIndex(element);
       
-      let slotElement = element as HTMLElement | null;
-      while (slotElement && !slotElement.classList.contains('face-slot')) {
-        slotElement = slotElement.parentElement as HTMLElement | null;
-      }
-      
-      if (slotElement && isDraggingTouch.current) {
-        const allSlots = Array.from(document.querySelectorAll('.face-slot'));
-        const targetIndex = allSlots.indexOf(slotElement);
-        
-        if (targetIndex !== -1 && startIndex !== targetIndex) {
-          setSlots((prev) => {
-            const newSlots = [...prev];
-            const draggedImage = newSlots[startIndex].image;
-            newSlots[startIndex] = {
-              ...newSlots[startIndex],
-              image: newSlots[targetIndex].image,
-            };
-            newSlots[targetIndex] = {
-              ...newSlots[targetIndex],
-              image: draggedImage,
-            };
-            return newSlots;
-          });
-        }
+      if (targetIndex !== -1 && isDraggingTouch.current && startIndex !== targetIndex) {
+        setSlots((prev) => {
+          const newSlots = [...prev];
+          const draggedImage = newSlots[startIndex].image;
+          newSlots[startIndex] = {
+            ...newSlots[startIndex],
+            image: newSlots[targetIndex].image,
+          };
+          newSlots[targetIndex] = {
+            ...newSlots[targetIndex],
+            image: draggedImage,
+          };
+          return newSlots;
+        });
       }
 
       touchStartIndexRef.current = null;
-      setTouchStartIndex(null);
       setDraggedIndex(null);
       setDragOverIndex(null);
       
-      // Reset drag flag after a short delay to prevent click
+      // Reset drag flag after delay - must be longer than mobile click delay (~300ms)
       setTimeout(() => {
         isDraggingTouch.current = false;
-      }, 100);
+      }, 350);
     };
 
+    // Use native event listeners with passive: false for iOS compatibility
+    document.addEventListener('touchstart', handleTouchStart, { passive: false });
     document.addEventListener('touchmove', handleTouchMove, { passive: false });
     document.addEventListener('touchend', handleTouchEnd);
 
     return () => {
+      document.removeEventListener('touchstart', handleTouchStart);
       document.removeEventListener('touchmove', handleTouchMove);
       document.removeEventListener('touchend', handleTouchEnd);
     };
   }, []);
-
-  const handleTouchStart = (index: number) => {
-    if (!slots[index].image) return;
-    isDraggingTouch.current = false;
-    touchStartIndexRef.current = index;
-    setTouchStartIndex(index);
-    setDraggedIndex(index);
-  };
 
   const handleGlobalDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -542,7 +546,6 @@ export default function Home() {
                   onDragLeave={handleDragLeave}
                   onDrop={(e) => handleDrop(e, index)}
                   onDragEnd={handleDragEnd}
-                  onTouchStart={() => handleTouchStart(index)}
                   onClick={() => handleSlotClick(index)}
                 >
                   <input
