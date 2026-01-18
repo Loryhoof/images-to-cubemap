@@ -1,0 +1,5 @@
+# Cubemap Creator
+User-agent: *
+Allow: /
+
+Sitemap: https://cubemap.kevinlabs.com/sitemap.xml

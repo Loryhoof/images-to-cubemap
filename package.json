@@ -1,6 +1,8 @@
 {
-  "name": "images-to-cubemap",
-  "version": "0.1.0",
+  "name": "cubemap-creator",
+  "version": "1.0.0",
+  "description": "Free online tool to create cubemap cross layouts from 6 images for game engines and 3D applications",
+  "author": "Kevin Klatt <klattkev@gmail.com> (https://x.com/klattkev)",
   "private": true,
   "scripts": {
     "dev": "next dev",

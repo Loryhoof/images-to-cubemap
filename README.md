@@ -1,36 +1,53 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Cubemap Creator
 
-## Getting Started
+A free, browser-based tool to create cubemap cross layouts from 6 images. Perfect for game developers and 3D artists who need skybox textures for Unity, Unreal Engine, Three.js, and other 3D engines.
 
-First, run the development server:
+**Live at:** [cubemap.kevinlabs.com](https://cubemap.kevinlabs.com)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Features
+
+- **Drag & Drop** – Upload images individually or drop all 6 at once
+- **Smart Detection** – Automatically places images based on filename patterns (px, nx, posx, negx, right, left, etc.)
+- **Reorder by Dragging** – Swap face positions by dragging images between slots
+- **Export as PNG** – Downloads a 2048×1536 cross layout ready for import
+- **No Backend** – Everything runs client-side, your images never leave your browser
+
+## Usage
+
+1. Upload 6 images (one for each cube face)
+2. Arrange them in the correct positions if needed
+3. Click "Export PNG" to download your cubemap
+
+The exported image uses the standard cross layout:
+
+```
+     [Top]
+[Left][Front][Right][Back]
+    [Bottom]
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Supported Filename Patterns
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+The tool auto-detects face names from common conventions:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Face   | Patterns                                    |
+|--------|---------------------------------------------|
+| Right  | `px`, `posx`, `+x`, `right`                |
+| Left   | `nx`, `negx`, `-x`, `left`                 |
+| Top    | `py`, `posy`, `+y`, `top`, `up`            |
+| Bottom | `ny`, `negy`, `-y`, `bottom`, `down`       |
+| Front  | `pz`, `posz`, `+z`, `front`, `forward`     |
+| Back   | `nz`, `negz`, `-z`, `back`, `backward`     |
 
-## Learn More
+## Development
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm install
+npm run dev
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Open [http://localhost:3000](http://localhost:3000)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Author
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Made by [Kevin Klatt](https://x.com/klattkev)

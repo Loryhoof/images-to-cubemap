@@ -3,21 +3,116 @@
 import { useState, useRef, useCallback } from "react";
 
 type CubeFace = "top" | "left" | "front" | "right" | "back" | "bottom";
+type ExportFormat = "cross" | "cross-vertical" | "strip-horizontal" | "strip-vertical" | "grid-3x2" | "grid-2x3";
 
 interface FaceSlot {
   face: CubeFace;
   image: string | null;
-  gridArea: string;
 }
 
+interface FormatConfig {
+  name: string;
+  width: number; // in face units
+  height: number; // in face units
+  positions: Record<CubeFace, { x: number; y: number }>;
+}
+
+const EXPORT_FORMATS: Record<ExportFormat, FormatConfig> = {
+  cross: {
+    name: "Cross (Horizontal)",
+    width: 4,
+    height: 3,
+    positions: {
+      top: { x: 1, y: 0 },
+      left: { x: 0, y: 1 },
+      front: { x: 1, y: 1 },
+      right: { x: 2, y: 1 },
+      back: { x: 3, y: 1 },
+      bottom: { x: 1, y: 2 },
+    },
+  },
+  "cross-vertical": {
+    name: "Cross (Vertical)",
+    width: 3,
+    height: 4,
+    positions: {
+      top: { x: 1, y: 0 },
+      left: { x: 0, y: 1 },
+      front: { x: 1, y: 1 },
+      right: { x: 2, y: 1 },
+      bottom: { x: 1, y: 2 },
+      back: { x: 1, y: 3 },
+    },
+  },
+  "strip-horizontal": {
+    name: "Strip (Horizontal)",
+    width: 6,
+    height: 1,
+    positions: {
+      right: { x: 0, y: 0 },
+      left: { x: 1, y: 0 },
+      top: { x: 2, y: 0 },
+      bottom: { x: 3, y: 0 },
+      front: { x: 4, y: 0 },
+      back: { x: 5, y: 0 },
+    },
+  },
+  "strip-vertical": {
+    name: "Strip (Vertical)",
+    width: 1,
+    height: 6,
+    positions: {
+      right: { x: 0, y: 0 },
+      left: { x: 0, y: 1 },
+      top: { x: 0, y: 2 },
+      bottom: { x: 0, y: 3 },
+      front: { x: 0, y: 4 },
+      back: { x: 0, y: 5 },
+    },
+  },
+  "grid-3x2": {
+    name: "Grid (3×2)",
+    width: 3,
+    height: 2,
+    positions: {
+      right: { x: 0, y: 0 },
+      left: { x: 1, y: 0 },
+      top: { x: 2, y: 0 },
+      bottom: { x: 0, y: 1 },
+      front: { x: 1, y: 1 },
+      back: { x: 2, y: 1 },
+    },
+  },
+  "grid-2x3": {
+    name: "Grid (2×3)",
+    width: 2,
+    height: 3,
+    positions: {
+      right: { x: 0, y: 0 },
+      left: { x: 1, y: 0 },
+      top: { x: 0, y: 1 },
+      bottom: { x: 1, y: 1 },
+      front: { x: 0, y: 2 },
+      back: { x: 1, y: 2 },
+    },
+  },
+};
+
 const INITIAL_SLOTS: FaceSlot[] = [
-  { face: "top", image: null, gridArea: "1 / 2 / 2 / 3" },
-  { face: "left", image: null, gridArea: "2 / 1 / 3 / 2" },
-  { face: "front", image: null, gridArea: "2 / 2 / 3 / 3" },
-  { face: "right", image: null, gridArea: "2 / 3 / 3 / 4" },
-  { face: "back", image: null, gridArea: "2 / 4 / 3 / 5" },
-  { face: "bottom", image: null, gridArea: "3 / 2 / 4 / 3" },
+  { face: "top", image: null },
+  { face: "left", image: null },
+  { face: "front", image: null },
+  { face: "right", image: null },
+  { face: "back", image: null },
+  { face: "bottom", image: null },
 ];
+
+// Convert x,y position to CSS grid-area (1-indexed)
+function getGridArea(pos: { x: number; y: number }): string {
+  const row = pos.y + 1;
+  const col = pos.x + 1;
+  return `${row} / ${col} / ${row + 1} / ${col + 1}`;
+}
 
 const FACE_LABELS: Record<CubeFace, string> = {
   top: "Top",
@@ -81,6 +176,7 @@ export default function Home() {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const [exportFormat, setExportFormat] = useState<ExportFormat>("cross");
   const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const bulkInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -252,22 +348,14 @@ export default function Home() {
 
   const exportCubemap = useCallback(() => {
     const FACE_SIZE = 512;
+    const format = EXPORT_FORMATS[exportFormat];
     const canvas = document.createElement("canvas");
-    canvas.width = FACE_SIZE * 4;
-    canvas.height = FACE_SIZE * 3;
+    canvas.width = FACE_SIZE * format.width;
+    canvas.height = FACE_SIZE * format.height;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    const positions: Record<CubeFace, { x: number; y: number }> = {
-      top: { x: 1, y: 0 },
-      left: { x: 0, y: 1 },
-      front: { x: 1, y: 1 },
-      right: { x: 2, y: 1 },
-      back: { x: 3, y: 1 },
-      bottom: { x: 1, y: 2 },
-    };
 
     let imagesLoaded = 0;
     const totalImages = slots.filter((s) => s.image).length;
@@ -282,7 +370,7 @@ export default function Home() {
 
       const img = new Image();
       img.onload = () => {
-        const pos = positions[slot.face];
+        const pos = format.positions[slot.face];
         ctx.drawImage(
           img,
           pos.x * FACE_SIZE,
@@ -298,7 +386,7 @@ export default function Home() {
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = "cubemap.png";
+            a.download = `cubemap-${exportFormat}.png`;
             a.click();
             URL.revokeObjectURL(url);
           }, "image/png");
@@ -306,7 +394,7 @@ export default function Home() {
       };
       img.src = slot.image;
     });
-  }, [slots]);
+  }, [slots, exportFormat]);
 
   const filledCount = slots.filter((s) => s.image).length;
 
@@ -330,117 +418,152 @@ export default function Home() {
         </div>
       )}
 
-      <header className="header">
-        <h1>Cubemap Creator</h1>
-        <p>Arrange 6 images into a cross cubemap layout</p>
-      </header>
-
-      <div className="upload-zone">
-        <input
-          ref={bulkInputRef}
-          type="file"
-          accept="image/*"
-          multiple
-          className="hidden"
-          onChange={(e) => handleBulkUpload(e.target.files)}
-        />
-        <button className="upload-btn" onClick={() => bulkInputRef.current?.click()}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="17 8 12 3 7 8" />
-            <line x1="12" y1="3" x2="12" y2="15" />
-          </svg>
-          Upload Images
-        </button>
-        <span className="upload-hint">or drag & drop up to 6 images anywhere</span>
-      </div>
-
-      <div className="cubemap-wrapper">
-        <div className="cubemap-grid">
-          {slots.map((slot, index) => (
-            <div
-              key={slot.face}
-              className={`face-slot ${slot.image ? "has-image" : ""} ${draggedIndex === index ? "dragging" : ""} ${dragOverIndex === index ? "drag-over" : ""}`}
-              style={{ gridArea: slot.gridArea }}
-              draggable={!!slot.image}
-              onDragStart={(e) => handleDragStart(e, index)}
-              onDragOver={(e) => handleDragOver(e, index)}
-              onDragLeave={handleDragLeave}
-              onDrop={(e) => handleDrop(e, index)}
-              onDragEnd={handleDragEnd}
-              onClick={() => handleSlotClick(index)}
+      <div className="app-layout">
+        <div className="panel panel-left">
+          <div className="cubemap-wrapper">
+            <div 
+              className="cubemap-grid"
+              style={{
+                gridTemplateColumns: `repeat(${EXPORT_FORMATS[exportFormat].width}, var(--slot-size))`,
+                gridTemplateRows: `repeat(${EXPORT_FORMATS[exportFormat].height}, var(--slot-size))`,
+              }}
             >
+              {slots.map((slot, index) => (
+                <div
+                  key={slot.face}
+                  className={`face-slot ${slot.image ? "has-image" : ""} ${draggedIndex === index ? "dragging" : ""} ${dragOverIndex === index ? "drag-over" : ""}`}
+                  style={{ gridArea: getGridArea(EXPORT_FORMATS[exportFormat].positions[slot.face]) }}
+                  draggable={!!slot.image}
+                  onDragStart={(e) => handleDragStart(e, index)}
+                  onDragOver={(e) => handleDragOver(e, index)}
+                  onDragLeave={handleDragLeave}
+                  onDrop={(e) => handleDrop(e, index)}
+                  onDragEnd={handleDragEnd}
+                  onClick={() => handleSlotClick(index)}
+                >
+                  <input
+                    ref={(el) => {
+                      fileInputRefs.current[index] = el;
+                    }}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) =>
+                      handleFileChange(index, e.target.files?.[0] || null)
+                    }
+                  />
+                  {slot.image ? (
+                    <>
+                      <img
+                        src={slot.image}
+                        alt={FACE_LABELS[slot.face]}
+                        draggable={false}
+                      />
+                      <button
+                        className="remove-btn"
+                        onClick={(e) => clearSlot(index, e)}
+                        title="Remove image"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <line x1="18" y1="6" x2="6" y2="18" />
+                          <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                      </button>
+                    </>
+                  ) : (
+                    <div className="empty-state">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                        <circle cx="8.5" cy="8.5" r="1.5" />
+                        <polyline points="21 15 16 10 5 21" />
+                      </svg>
+                    </div>
+                  )}
+                  <span className="face-label">{FACE_LABELS[slot.face]}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="panel panel-right">
+          <header className="header">
+            <h1>Cubemap Creator</h1>
+            <p>Arrange 6 images and export in multiple formats</p>
+          </header>
+
+          <div className="controls">
+            <div className="control-group">
+              <label className="control-label">Upload Images</label>
               <input
-                ref={(el) => {
-                  fileInputRefs.current[index] = el;
-                }}
+                ref={bulkInputRef}
                 type="file"
                 accept="image/*"
+                multiple
                 className="hidden"
-                onChange={(e) =>
-                  handleFileChange(index, e.target.files?.[0] || null)
-                }
+                onChange={(e) => handleBulkUpload(e.target.files)}
               />
-              {slot.image ? (
-                <>
-                  <img
-                    src={slot.image}
-                    alt={FACE_LABELS[slot.face]}
-                    draggable={false}
-                  />
-                  <button
-                    className="remove-btn"
-                    onClick={(e) => clearSlot(index, e)}
-                    title="Remove image"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                      <line x1="18" y1="6" x2="6" y2="18" />
-                      <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
-                  </button>
-                </>
-              ) : (
-                <div className="empty-state">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                    <circle cx="8.5" cy="8.5" r="1.5" />
-                    <polyline points="21 15 16 10 5 21" />
-                  </svg>
-                </div>
-              )}
-              <span className="face-label">{FACE_LABELS[slot.face]}</span>
+              <button className="upload-btn" onClick={() => bulkInputRef.current?.click()}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+                Choose Files
+              </button>
+              <span className="upload-hint">or drag & drop anywhere</span>
             </div>
-          ))}
+
+            <div className="control-group">
+              <label className="control-label">Layout Format</label>
+              <select
+                value={exportFormat}
+                onChange={(e) => setExportFormat(e.target.value as ExportFormat)}
+                className="format-select"
+              >
+                {Object.entries(EXPORT_FORMATS).map(([key, config]) => (
+                  <option key={key} value={key}>
+                    {config.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="control-group">
+              <label className="control-label">Export</label>
+              <div className="actions">
+                <button
+                  onClick={clearAll}
+                  disabled={filledCount === 0}
+                  className="btn btn-secondary"
+                >
+                  Clear All
+                </button>
+                <button
+                  onClick={exportCubemap}
+                  disabled={filledCount === 0}
+                  className="btn btn-primary"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                  Export PNG
+                </button>
+              </div>
+            </div>
+
+            <div className="status-bar">
+              <span className="status-count">{filledCount}/6 faces filled</span>
+            </div>
+          </div>
+
+          <footer className="footer">
+            <span>Made by <a href="https://x.com/klattkev" target="_blank" rel="noopener noreferrer">Kevin Klatt</a></span>
+          </footer>
         </div>
       </div>
-
-      <div className="actions">
-        <button
-          onClick={clearAll}
-          disabled={filledCount === 0}
-          className="btn btn-secondary"
-        >
-          Clear All
-        </button>
-        <button
-          onClick={exportCubemap}
-          disabled={filledCount === 0}
-          className="btn btn-primary"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" y1="15" x2="12" y2="3" />
-          </svg>
-          Export PNG
-        </button>
-      </div>
-
-        <footer className="footer">
-          <span>{filledCount}/6 faces</span>
-          <span>•</span>
-          <span>Made by <a href="https://x.com/klattkev" target="_blank" rel="noopener noreferrer" style={{ color: '#3b82f6', textDecoration: 'underline' }}>Kevin Klatt</a></span>
-        </footer>
     </div>
   );
 }
