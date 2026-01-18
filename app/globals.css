@@ -330,6 +330,7 @@ body {
   display: grid;
   gap: 4px;
   transition: all 0.3s ease;
+  touch-action: none;
 }
 
 @media (min-width: 768px) {
@@ -349,6 +350,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .face-slot:hover {
@@ -365,6 +369,12 @@ body {
 .face-slot.has-image:hover {
   border-color: var(--blue);
   box-shadow: 0 0 0 3px var(--blue-light);
+}
+
+.face-slot.has-image:active {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px var(--blue-light);
+  transform: scale(0.98);
 }
 
 .face-slot.dragging {

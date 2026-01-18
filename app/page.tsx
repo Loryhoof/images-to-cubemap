@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback } from "react";
 
 type CubeFace = "top" | "left" | "front" | "right" | "back" | "bottom";
 type ExportFormat = "cross" | "cross-vertical" | "strip-horizontal" | "strip-vertical" | "grid-3x2" | "grid-2x3";
@@ -177,8 +177,12 @@ export default function Home() {
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [exportFormat, setExportFormat] = useState<ExportFormat>("cross");
+  const [touchStartIndex, setTouchStartIndex] = useState<number | null>(null);
   const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const bulkInputRef = useRef<HTMLInputElement | null>(null);
+  const slotRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const touchStartIndexRef = useRef<number | null>(null);
+  const isDraggingTouch = useRef(false);
 
   const handleFileChange = useCallback(
     (index: number, file: File | null) => {
@@ -311,7 +315,103 @@ export default function Home() {
   };
 
   const handleSlotClick = (index: number) => {
+    // Don't trigger file input if we just finished a drag
+    if (isDraggingTouch.current) {
+      isDraggingTouch.current = false;
+      return;
+    }
     fileInputRefs.current[index]?.click();
+  };
+
+  // Touch event handlers - document level for reliability
+  React.useEffect(() => {
+    const handleTouchMove = (e: TouchEvent) => {
+      const startIndex = touchStartIndexRef.current;
+      if (startIndex === null) return;
+      
+      isDraggingTouch.current = true;
+      e.preventDefault();
+      
+      const touch = e.touches[0];
+      const element = document.elementFromPoint(touch.clientX, touch.clientY);
+      
+      // Find the face-slot element
+      let slotElement = element as HTMLElement | null;
+      while (slotElement && !slotElement.classList.contains('face-slot')) {
+        slotElement = slotElement.parentElement as HTMLElement | null;
+      }
+      
+      if (slotElement) {
+        const allSlots = Array.from(document.querySelectorAll('.face-slot'));
+        const targetIndex = allSlots.indexOf(slotElement);
+        if (targetIndex !== -1) {
+          setDragOverIndex(targetIndex);
+        }
+      } else {
+        setDragOverIndex(null);
+      }
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      const startIndex = touchStartIndexRef.current;
+      if (startIndex === null) return;
+
+      // Get the element under the touch point
+      const touch = e.changedTouches[0];
+      const element = document.elementFromPoint(touch.clientX, touch.clientY);
+      
+      let slotElement = element as HTMLElement | null;
+      while (slotElement && !slotElement.classList.contains('face-slot')) {
+        slotElement = slotElement.parentElement as HTMLElement | null;
+      }
+      
+      if (slotElement && isDraggingTouch.current) {
+        const allSlots = Array.from(document.querySelectorAll('.face-slot'));
+        const targetIndex = allSlots.indexOf(slotElement);
+        
+        if (targetIndex !== -1 && startIndex !== targetIndex) {
+          setSlots((prev) => {
+            const newSlots = [...prev];
+            const draggedImage = newSlots[startIndex].image;
+            newSlots[startIndex] = {
+              ...newSlots[startIndex],
+              image: newSlots[targetIndex].image,
+            };
+            newSlots[targetIndex] = {
+              ...newSlots[targetIndex],
+              image: draggedImage,
+            };
+            return newSlots;
+          });
+        }
+      }
+
+      touchStartIndexRef.current = null;
+      setTouchStartIndex(null);
+      setDraggedIndex(null);
+      setDragOverIndex(null);
+      
+      // Reset drag flag after a short delay to prevent click
+      setTimeout(() => {
+        isDraggingTouch.current = false;
+      }, 100);
+    };
+
+    document.addEventListener('touchmove', handleTouchMove, { passive: false });
+    document.addEventListener('touchend', handleTouchEnd);
+
+    return () => {
+      document.removeEventListener('touchmove', handleTouchMove);
+      document.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, []);
+
+  const handleTouchStart = (index: number) => {
+    if (!slots[index].image) return;
+    isDraggingTouch.current = false;
+    touchStartIndexRef.current = index;
+    setTouchStartIndex(index);
+    setDraggedIndex(index);
   };
 
   const handleGlobalDrop = (e: React.DragEvent) => {
@@ -431,6 +531,9 @@ export default function Home() {
               {slots.map((slot, index) => (
                 <div
                   key={slot.face}
+                  ref={(el) => {
+                    slotRefs.current[index] = el;
+                  }}
                   className={`face-slot ${slot.image ? "has-image" : ""} ${draggedIndex === index ? "dragging" : ""} ${dragOverIndex === index ? "drag-over" : ""}`}
                   style={{ gridArea: getGridArea(EXPORT_FORMATS[exportFormat].positions[slot.face]) }}
                   draggable={!!slot.image}
@@ -439,6 +542,7 @@ export default function Home() {
                   onDragLeave={handleDragLeave}
                   onDrop={(e) => handleDrop(e, index)}
                   onDragEnd={handleDragEnd}
+                  onTouchStart={() => handleTouchStart(index)}
                   onClick={() => handleSlotClick(index)}
                 >
                   <input
